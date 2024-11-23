@@ -1,6 +1,7 @@
 use std::io::Read;
 
-use rouille::Request;
+use base64::Engine;
+use rouille::{Request, Response};
 
 pub fn request_to_bytes(request: &Request) -> Vec<u8> {
     let mut buffer = Vec::new();
@@ -8,14 +9,23 @@ pub fn request_to_bytes(request: &Request) -> Vec<u8> {
     buffer
 }
 
+pub fn response_to_bytes(response: Response) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    response.data.into_reader_and_size().0.read_to_end(&mut buffer).unwrap();
+    buffer
+}
+
 pub fn get_user_level(request: &Request) -> i32 {
+    get_header_value(request, "X-User-Level").unwrap().parse().unwrap_or(0)
+}
+
+pub fn get_header_value(request: &Request, header: &str) -> Option<String> {
     let mut headers = request.headers();
-    let level = headers.find(|&k| k.0 == "X-User-Level");
-    if level.is_none() {
-        return 0;
+    let value = headers.find(|&k| k.0 == header);
+    if value.is_none() {
+        return None;
     }
-    let level: i32 = level.unwrap().1.parse().unwrap_or(0);
-    level
+    Some(value.unwrap().1.to_string())
 }
 
 pub fn generate_token() -> String {
@@ -25,4 +35,13 @@ pub fn generate_token() -> String {
         .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
         .collect();
     token
+}
+
+pub fn from_b64(input: &str) -> String {
+    let decoded = base64::prelude::BASE64_STANDARD.decode(input.as_bytes()).unwrap();
+    String::from_utf8(decoded).unwrap()
+}
+
+pub fn to_b64(input: &str) -> String {
+    base64::prelude::BASE64_STANDARD.encode(input.as_bytes())
 }
